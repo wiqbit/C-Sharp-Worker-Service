@@ -25,10 +25,10 @@ INNER JOIN sys.indexes AS i WITH (NOLOCK)
         AND i.index_id = p.index_id
 INNER JOIN sys.objects AS o WITH (NOLOCK)
         ON o.object_id = i.object_id
-INNER JOIN sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL , NULL, N'LIMITED') dmv
-        ON dmv.OBJECT_ID = i.object_id
+INNER JOIN sys.dm_db_index_physical_stats (DB_ID(), NUL, NULL , NULL, N'LIMITED') dmv
+        ON dmv.object_id = i.object_id
         AND dmv.index_id = i.index_id
-        AND dmv.partition_number  = p.partition_number
+        AND dmv.partition_number = p.partition_number
 LEFT JOIN sys.data_spaces AS ds WITH (NOLOCK)
       ON ds.data_space_id = i.data_space_id
 LEFT JOIN sys.partition_schemes AS ps WITH (NOLOCK)
@@ -61,40 +61,38 @@ WHERE
 		{
 			string commandText = string.Empty;
 
-			if (model.IsPartitioned)
-			{
-				commandText = @$"
-ALTER INDEX [{model.IndexName}] ON [{model.SchemaName}].[{model.TableName}]
-{(rebuild ? "REBUILD" : "REORGANIZE")} PARTITION = {model.PartitionNumber} WITH ( ONLINE = ON )";
-			}
-			else
-			{
-				commandText = @$"
-ALTER INDEX [{model.IndexName}] ON [{model.SchemaName}].[{model.TableName}]
-{(rebuild ? "REBUILD" : "REORGANIZE")} WITH ( ONLINE = ON )";
-			}
-
-			try
-			{
-				await base.ExecuteNonQuery(connectionString, CommandType.Text, commandText);
-			}
-			catch
+			if (rebuild)
 			{
 				if (model.IsPartitioned)
 				{
 					commandText = @$"
 ALTER INDEX [{model.IndexName}] ON [{model.SchemaName}].[{model.TableName}]
-{(rebuild ? "REBUILD" : "REORGANIZE")} PARTITION = {model.PartitionNumber}";
+REBUILD PARTITION = {model.PartitionNumber};";
 				}
 				else
 				{
 					commandText = @$"
 ALTER INDEX [{model.IndexName}] ON [{model.SchemaName}].[{model.TableName}]
-{(rebuild ? "REBUILD" : "REORGANIZE")}";
+REBUILD;";
 				}
-
-				await base.ExecuteNonQuery(connectionString, CommandType.Text, commandText);
 			}
+			else
+			{
+				if (model.IsPartitioned)
+				{
+					commandText = @$"
+ALTER INDEX [{model.IndexName}] ON [{model.SchemaName}].[{model.TableName}]
+REORGANIZE PARTITION = {model.PartitionNumber};";
+				}
+				else
+				{
+					commandText = @$"
+ALTER INDEX [{model.IndexName}] ON [{model.SchemaName}].[{model.TableName}]
+REORGANIZE;";
+				}
+			}
+
+			await base.ExecuteNonQuery(connectionString, CommandType.Text, commandText);
 		}
 	}
 }
